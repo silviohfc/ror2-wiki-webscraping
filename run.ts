@@ -32,8 +32,14 @@ async function getItemInfo(url) {
     const $ = cheerio.load(response.data)
     
     const itemTitle = $('h1#firstHeading').text().trim().replace('\n', '');
-    const itemIcon = $('table.infoboxtable').find('img').attr().src;
     
+    let itemIcon = $('table.infoboxtable').find(`img[alt="${itemTitle}.png"]`).first().attr('data-src');
+    let formattedItemIcon = ''
+    if (!itemIcon) {
+        itemIcon = $('table.infoboxtable').find(`img[alt="${itemTitle}.png"]`).first().attr().src;
+    }
+    formattedItemIcon = itemIcon.replace(/\/revision(.+)/g, '');
+
     const itemRarity = $('td').filter(function() {
         return $(this).text().trim() === 'Rarity';
     }).next().text().replace('\n', '');
@@ -62,7 +68,7 @@ async function getItemInfo(url) {
 
     const item = {
         title: itemTitle,
-        icon: itemIcon,
+        icon: formattedItemIcon,
         category: itemCategory,
         rarity: itemRarity,
         stats: sanitizedItemStats
@@ -78,6 +84,7 @@ async function saveCsv(items: any[]) {
     const csv = j2cp.parse(items);
 
     await fsp.writeFile('./output.csv', csv, { encoding: "utf-8" })
+    await fsp.writeFile('./output.json', JSON.stringify(items, null, 2), { encoding: "utf-8" })
 }
 
 (async () => {
