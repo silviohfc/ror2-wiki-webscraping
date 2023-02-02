@@ -40,6 +40,10 @@ async function getItemInfo(url) {
     }
     formattedItemIcon = itemIcon.replace(/\/revision(.+)/g, '');
 
+    const itemDescription = $('td').filter(function() {
+        return $(this).text().trim() === 'Rarity';
+    }).parent().prev().children().text().trim();
+
     const itemRarity = $('td').filter(function() {
         return $(this).text().trim() === 'Rarity';
     }).next().text().replace('\n', '');
@@ -68,6 +72,7 @@ async function getItemInfo(url) {
 
     const item = {
         title: itemTitle,
+        description: itemDescription,
         icon: formattedItemIcon,
         category: itemCategory,
         rarity: itemRarity,
