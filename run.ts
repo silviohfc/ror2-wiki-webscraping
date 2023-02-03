@@ -5,6 +5,47 @@ import * as fsp from 'fs/promises'
 
 const BASE_URL = "https://riskofrain2.fandom.com"
 
+function formatIconUrl(url: string) {
+    return url.replace(/\/revision(.+)/g, '');
+}
+
+async function getCharacters() {
+    const response = await axios.get(`${BASE_URL}/Survivors`)
+    const $ = cheerio.load(response.data)
+
+    const tbody = $('table.wikitable tbody')
+
+    const charactersInfoRaw: String[] = []
+    tbody.children().next().each((index, element) => {
+        if (element) {
+            const title = $(element).find('a').text().trim()
+            const icon = $(element).find('img').attr('data-src') as string
+            const health = $(element).children('td:nth-child(3)').text().trim()
+            const damage = $(element).children('td:nth-child(4)').text().trim()
+            const healthRegen = $(element).children('td:nth-child(5)').text().trim()
+            const classType = $(element).children('td:nth-child(6)').text().trim()
+            const armor = $(element).children('td:nth-child(7)').text().trim()
+            const movementSpeed = $(element).children('td:nth-child(8)').text().trim()
+            const mass = $(element).children('td:nth-child(9)').text().trim()
+            
+            console.info(`Successfully got ${title} character!`);
+            charactersInfoRaw.push({
+                title,
+                icon: formatIconUrl(icon),
+                health,
+                damage,
+                healthRegen,
+                classType,
+                armor,
+                movementSpeed,
+                mass
+            })
+        }
+    })
+
+    return charactersInfoRaw
+}
+
 async function getItemsLinks() {
     const response = await axios.get(`${BASE_URL}/wiki/Items`);
     
@@ -26,8 +67,8 @@ async function getItemsLinks() {
     return itemsLinks
 }
 
-async function getItemInfo(url) {
-    const response = await axios.get(url);
+async function getItemInfo(resource: string) {
+    const response = await axios.get(`${BASE_URL}${resource}`);
     
     const $ = cheerio.load(response.data)
     
@@ -38,7 +79,7 @@ async function getItemInfo(url) {
     if (!itemIcon) {
         itemIcon = $('table.infoboxtable').find(`img[alt="${itemTitle}.png"]`).first().attr().src;
     }
-    formattedItemIcon = itemIcon.replace(/\/revision(.+)/g, '');
+    formattedItemIcon = formatIconUrl(itemIcon)
 
     const itemDescription = $('td').filter(function() {
         return $(this).text().trim() === 'Rarity';
@@ -83,23 +124,25 @@ async function getItemInfo(url) {
     return item
 }
 
-async function saveCsv(items: any[]) {
+async function saveCsv(data: any[], filename) {
     console.info(`Creating CSV...`);
     const j2cp = new json2csv.Parser();
-    const csv = j2cp.parse(items);
+    const csv = j2cp.parse(data);
 
-    await fsp.writeFile('./output.csv', csv, { encoding: "utf-8" })
-    await fsp.writeFile('./output.json', JSON.stringify(items, null, 2), { encoding: "utf-8" })
+    await fsp.writeFile(`./${filename}.csv`, csv, { encoding: "utf-8" })
+    await fsp.writeFile(`./${filename}.json`, JSON.stringify(data, null, 2), { encoding: "utf-8" })
 }
 
 (async () => {
+    const characters = await getCharacters();
     const itemsLinks = await getItemsLinks();
     const itemsList: any[] = []
 
     for (let resource of itemsLinks) {
-        const item = await getItemInfo(`${BASE_URL}${resource}`)
+        const item = await getItemInfo(resource)
         itemsList.push(item)
     }
 
-    await saveCsv(itemsList)
+    await saveCsv(itemsList, 'items')
+    await saveCsv(characters, 'characters')
 })();
